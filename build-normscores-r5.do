@@ -119,7 +119,7 @@ label drop childactivity //for some reason j takes the value label childactivity
 merge m:1 j_item using "$dropboxuser/$data/int/choose5math.dta", nogen
 
 *Calculate the zscores limited to the selected items
-forvalues v = 1/500 { //note: this loops takes about 1.5hours to run
+forvalues v = 1/100 { //note: this loops takes about 20min to run
 	preserve
 		keep if selected`v' == 1
 		bys childcode: egen math_sum_5items`v'=total(math_item)
@@ -132,13 +132,15 @@ forvalues v = 1/500 { //note: this loops takes about 1.5hours to run
 	
 	merge m:1 childcode using `s`v'', nogen	
 }	
+
+save "$dropboxuser/$data/int/zscores_choose5math.dta", replace	
 	
 *Collapse back to the child level to calculate the zscores 
 keep district childcode mauzaid schoolid child_age child_panel math_zscore math_sum_5items*
 duplicates drop
 	
 *Calculate zscores 
-forvalues v = 1/283 {
+forvalues v = 1/100 {
 	egen math_zscore_5items`v' = std(math_sum_5items`v')
 }
 
@@ -150,14 +152,98 @@ eststo clear
 reg math_zscore reportcard i.district, cl(mauzaid)	
 	eststo og
 	
-forvalues v=1/283 {		
+forvalues v=1/100 {		
 reg math_zscore_5items`v' reportcard i.district, cl(mauzaid)	
 	eststo chose5_`v'
 }
 
-speccurve, param(reportcard) main(og) title("283 models with 5 random math items")  addscalar(r2, graphopts(ytitle(R squared)))
-		graph export "$dropboxuser/$output/speccurve_5items.png", as(png)
+speccurve, param(reportcard) main(og) title("100 models with 5 random math items")  addscalar(r2, graphopts(ytitle(R squared)))
+		graph export "$dropboxuser/$output/speccurve_5items.png", as(png) replace
 
+		
+		
+********** Generate the score for 10 random items out of the 44
+
+*Select 10 items randomly
+import excel "$dropboxuser/$data/math_items.xlsx", clear firstrow
+
+set seed 2
+isid n
+
+forvalues v = 1/100 {
+	sort n
+	gen r`v' = runiform()
+	sort r`v' 
+	egen rank`v'=rank(r`v')
+	gen selected`v'=rank`v'<=10	
+}
+
+keep j_item selected*
+isid j_item
+
+save "$dropboxuser/$data/int/choose10math.dta", replace
+
+*Load raw scores and reshape on items to be able to merge with the selected items 
+use "$dropboxuser/$data/int/zscores_r5.dta", clear
+keep district childcode mauzaid schoolid child_age child_panel math_item* math_zscore
+
+reshape long math_item, i(childcode) j(j_item)
+label drop childactivity //for some reason j takes the value label childactivity, which we drop
+
+merge m:1 j_item using "$dropboxuser/$data/int/choose10math.dta", nogen
+
+*Calculate the zscores limited to the selected items
+forvalues v = 1/100 { //note: this loops takes about 5min to run
+	preserve
+		keep if selected`v' == 1
+		bys childcode: egen math_sum_10items`v'=total(math_item)
+		keep childcode math_sum_10items`v'
+		duplicates drop
+		
+		tempfile s`v'
+		save `s`v''
+	restore
+	
+	merge m:1 childcode using `s`v'', nogen	
+}	
+
+save "$dropboxuser/$data/int/zscores_choose10math.dta", replace
+	
+*Collapse back to the child level to calculate the zscores 
+keep district childcode mauzaid schoolid child_age child_panel math_zscore math_sum_10items*
+duplicates drop
+	
+*Calculate zscores 
+forvalues v = 1/100 {
+	egen math_zscore_10items`v' = std(math_sum_10items`v')
+}
+
+*Analysis wrt RCT
+merge m:1 mauzaid using "$dropboxuser/$RCT/mauzas.dta"	
+	
+eststo clear
+	
+reg math_zscore reportcard i.district, cl(mauzaid)	
+	eststo og
+	
+forvalues v=1/100 {		
+reg math_zscore_5items`v' reportcard i.district, cl(mauzaid)	
+	eststo chose5_`v'
+}
+
+speccurve, param(reportcard) main(og) title("100 models with 10 random math items")  addscalar(r2, graphopts(ytitle(R squared)))
+		graph export "$dropboxuser/$output/speccurve_10items.png", as(png)
+
+		
+		
+*Reshape by permutation (long) to regress how zscore_wo is predicted by z_score (with child fixed effects)
+reshape long math_sum_10items math_zscore_10items, i(childcode) j(n_perm)
+
+xtset childcode n_perm
+xtreg math_zscore_10items math_zscore
+		
+save "$dropboxuser/$data/int/long_perms_choose10math.dta", replace
+		
 	
 /////////////////////////////////////////////
 
