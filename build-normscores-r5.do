@@ -23,17 +23,57 @@ keep if math_count==44
 *Drop all the variables that have missing values for everybody
 missings dropvars, force
 
-*Generate the z score (dev from the mean, IN standard deviations) for each topic
-egen math_zscore = std(math_sum)
-egen eng_zscore = std(eng_sum)
-egen urdu_zscore = std(urdu_sum)
-egen all_zscore = std(allsubjects_sum)
+* Keep variables of interest only
+keep childcode math_item* math_sum math_count
 
-*Generate the scores with all items MINUS 1 item
+*Generate the z score (dev from the mean, IN standard deviations) for each topic
+egen math_score = std(math_sum)
+		*egen eng_zscore = std(eng_sum)
+		*egen urdu_zscore = std(urdu_sum)
+		*egen all_zscore = std(allsubjects_sum)
+
+*Number the items consistently
 	rename math_item01 math_item1
 	rename math_item03 math_item3
 	rename math_item09 math_item9
-global itemnumbers 1 3 9 11 12 13 15 16 18 19 20 22 23 24 25 26 27 28 30 31 32 33 34 37 38 39 40 42 43 44 48 49 50 51 52 53 54 55 56 57 58 59 60 61
+global itemnumbers 
+
+*Generate score with 5 items
+
+program fiveitems 
+	* Select 5 items randomly
+	local items "1 3 9 11 12 13 15 16 18 19 20 22 23 24 25 26 27 28 30 31 32 33 34 37 38 39 40 42 43 44 48 49 50 51 52 53 54 55 56 57 58 59 60 61"
+	local nofitems : list sizeof items												//Obtain total item numbers
+	local selecteditems ""															//Initialize list of selected items
+	local len : list sizeof selecteditems											//Initialize lenght of list of selected items
+	while `len' < 5 {																//Add a new item to the list until we reach the wanted size of the list
+		local rand = floor(runiform()*`nofitems') + 1								//Select a random integer between 1 and the total number of items ( +1 because floor can select 0)
+		local item : word `rand' of `items'											//Take the rand*th item from the list of items
+		local selecteditems `selecteditems' `item'									//Add the selected item to the list of items
+		local selecteditems : list uniq selecteditems								//Remove duplicates from the selected items list
+		local len : list sizeof selecteditems										//Recalculate the size of the selected items list (so that the while ends when we reach the desired size)
+	}
+		
+	* Store the index of each of the selected items								//make a loop
+	dis "`selecteditems'"
+	local j1 : word 1 of `selecteditems'
+	local j2 : word 2 of `selecteditems'
+	local j3 : word 3 of `selecteditems'
+	local j4 : word 4 of `selecteditems'
+	local j5 : word 5 of `selecteditems'
+
+	* Calculate the score with these five items
+	gen math_sum_5items_`1' = math_item`j1' + math_item`j2' + math_item`j3' + math_item`j4' + math_item`j5'
+	egen math_score_5items_`1' = std(math_sum_5items_`1')	
+end
+
+forvalues i=1/500 {
+	fiveitems `i'	
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+*Generate the scores with all items MINUS 1 item
 foreach i in $itemnumbers {
 	gen math_sum_wo`i' = math_sum - math_item`i'
 	egen math_zscore_wo`i' = std(math_sum_wo`i')
@@ -118,29 +158,46 @@ label drop childactivity //for some reason j takes the value label childactivity
 
 merge m:1 j_item using "$dropboxuser/$data/int/choose5math.dta", nogen
 
-*Calculate the zscores limited to the selected items
-forvalues v = 1/100 { //note: this loops takes about 20min to run
-	preserve
-		keep if selected`v' == 1
-		bys childcode: egen math_sum_5items`v'=total(math_item)
-		keep childcode math_sum_5items`v'
-		duplicates drop
-		
-		tempfile s`v'
-		save `s`v''
-	restore
-	
-	merge m:1 childcode using `s`v'', nogen	
-}	
+* Calculate the test scores for each child on the selected items only
+forvalues v=1/500 {
+	bys childcode selected`v' : egen temp`v'=total(math_item)
+	gen uniquetemp`v' = temp`v' if selected`v'==1
+	bys childcode: egen math_sum_5items`v'=max(uniquetemp`v')
+	drop temp`v' uniquetemp`v'
+}
 
-save "$dropboxuser/$data/int/zscores_choose5math.dta", replace	
-	
-*Collapse back to the child level to calculate the zscores 
+* Collpase back at the child level
 keep district childcode mauzaid schoolid child_age child_panel math_zscore math_sum_5items*
-duplicates drop
-	
+duplicates drop 
+
+		{ /* OLD (LONGER) CALCULATION
+		*Calculate the zscores limited to the selected items
+		forvalues v = 1/100 { //note: this loops takes about 20min to run
+			preserve
+				keep if selected`v' == 1
+				bys childcode: egen math_sum_5items`v'=total(math_item)
+				keep childcode math_sum_5items`v'
+				duplicates drop
+				
+				tempfile s`v'
+				save `s`v''
+			restore
+			
+			merge m:1 childcode using `s`v'', nogen	
+		}	
+		
+		save "$dropboxuser/$data/int/zscores_choose5math.dta", replace	
+		
+		*Collapse back to the child level to calculate the zscores 
+		keep district childcode mauzaid schoolid child_age child_panel math_zscore math_sum_5items*
+		duplicates drop		
+		
+			*/
+		}
+
+
 *Calculate zscores 
-forvalues v = 1/100 {
+forvalues v = 1/500 {
 	egen math_zscore_5items`v' = std(math_sum_5items`v')
 }
 
