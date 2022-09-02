@@ -3,7 +3,6 @@
 	Create z-scores for round 5 tests
 
 *******************************************************************************/
-
 	////// Set up //////
 
 * Load the file paths
@@ -24,7 +23,10 @@ keep if math_count==44
 missings dropvars, force
 
 * Keep variables of interest only
-keep childcode math_item* math_sum math_count
+keep childcode math_item* math_sum math_count mauzaid child_age child_female 
+
+* Add the RCT data 
+merge m:1 mauzaid using "$dropboxuser/$RCT/mauzas.dta", nogen
 
 *Generate the z score (dev from the mean, IN standard deviations) for each topic
 egen math_score = std(math_sum)
@@ -36,42 +38,149 @@ egen math_score = std(math_sum)
 	rename math_item01 math_item1
 	rename math_item03 math_item3
 	rename math_item09 math_item9
-global itemnumbers 
 
-*Generate score with 5 items
 
-program fiveitems 
-	* Select 5 items randomly
-	local items "1 3 9 11 12 13 15 16 18 19 20 22 23 24 25 26 27 28 30 31 32 33 34 37 38 39 40 42 43 44 48 49 50 51 52 53 54 55 56 57 58 59 60 61"
-	local nofitems : list sizeof items												//Obtain total item numbers
-	local selecteditems ""															//Initialize list of selected items
-	local len : list sizeof selecteditems											//Initialize lenght of list of selected items
-	while `len' < 5 {																//Add a new item to the list until we reach the wanted size of the list
-		local rand = floor(runiform()*`nofitems') + 1								//Select a random integer between 1 and the total number of items ( +1 because floor can select 0)
-		local item : word `rand' of `items'											//Take the rand*th item from the list of items
-		local selecteditems `selecteditems' `item'									//Add the selected item to the list of items
-		local selecteditems : list uniq selecteditems								//Remove duplicates from the selected items list
-		local len : list sizeof selecteditems										//Recalculate the size of the selected items list (so that the while ends when we reach the desired size)
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+///////////////////////////////////////////////////////////////////////////////	
+	
+************ DRAFT	
+	
+	
+	/*
+
+
+
+/// Program that takes the simulated data and returns regression results
+
+program selectitemsreg
+
+	syntax varlist(min=2 numeric fv ts) [if] [weight], SELECTed(integer) ITERations(integer) stub(namelist max=1 id="stubname" local)
+	
+	* Extrat the Y variable from the varlist, and the X vars from the varlist
+	local yvar : word 1 of `varlist'		
+	local xvars : `varlist' - `yvar'
+	
+	* Create the data simulations
+	selectitems_data `stub', selected(`selected') iterations(`iterations')
+	
+	* Run the normal reg
+	reg `varlist' `if' `weight'
+
+	* Run the reg with the created variables
+	forvalues i = 1/`iterations' {
+		reg  std_`selected'items_* `xvars' `if' `weight'
 	}
-		
-	* Store the index of each of the selected items								//make a loop
-	dis "`selecteditems'"
-	local j1 : word 1 of `selecteditems'
-	local j2 : word 2 of `selecteditems'
-	local j3 : word 3 of `selecteditems'
-	local j4 : word 4 of `selecteditems'
-	local j5 : word 5 of `selecteditems'
+	
+end 
 
-	* Calculate the score with these five items
-	gen math_sum_5items_`1' = math_item`j1' + math_item`j2' + math_item`j3' + math_item`j4' + math_item`j5'
-	egen math_score_5items_`1' = std(math_sum_5items_`1')	
-end
+selectitemsreg math_score reportcard, select(5) iter(10) stub(math_item)
+
+
+
+	* Extrat the Y variable from the varlist, and the X vars from the varlist
+	local varlist = "math_score reportcard"
+	local yvar : word 1 of "`varlist'"		
+	local xvars : list "`varlist'" - "`yvar'"
+	
+	dis "`varlist'"
+	dis "`yvar'"
+	dis "`xvars'"
+
+
+exit
+/*
+
+		local namelist math_item
+		local select 5
+		local selecteditems "1 3 9 11 12"
+		
+		forvalues iteration = 1/10 {
+
+			* Calculate the score with these five items
+		}
+
+
+exit
 
 forvalues i=1/500 {
 	fiveitems `i'	
 }
 
+* Save the dataset generated
+save "$dropboxuser/$data/int/5items_data.dta", replace
+
+cpcorr math_score_5items_* \ math_score
+
+* Save matrix of coefficients into a dataset
+
+svmat r(C), names(eqcol)														// Make the correlation coefficients into the dataset and use their equation name (ie a _ will be added at the beginning of the coefficient)
+keep _*																			// Only keep these variables
+duplicates drop																	// Delete all the empty obs (all duplicates, fully missing) : now the number of n is the number of correlation coefficients
+drop if _math_score == .														// Delete an empty obs
+
+	/*TODO CHECK : _n here is number of simulations*/
+
+* Add back the item selected for each
+gen n = _n
+
+* Add back the list of selected items for each 
+gen selected_items = ""
+forvalues i = 1/500 {
+	replace selected_items = "${selecteditems_`i'}" if _n==`i'	
+}
+
+* Display histogram 
+
+hist _math_score 
+
+exit
+
+
+
+
+
+
+
+
+
+
+
+
 ////////////////////////////////////////////////////////////////////////////////
+
+**************** ARCHIVE
+
+	/* OBTAIN THE LIST OF SELECTED ITEMS
+	keep selected_5items*
+	duplicates drop
+	gen i = 1
+	reshape long selected_5items_, i(i) j(n)
+	label drop childactivity
+	*/
+
+
+*pwcorr math_score math_score_5items_*, sig star(.05)
+
 
 *Generate the scores with all items MINUS 1 item
 foreach i in $itemnumbers {
