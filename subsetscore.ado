@@ -108,7 +108,7 @@ preserve			// Preserve so that the original dataset comes back
 	egen mean = mean(std_total)
 
 	*** Calculate the difference between subsetted score and full score
-	forvalues i = 1/100 {
+	forvalues i = 1/`iterations' {
 			* difference for each individual for each simulation
 		gen diff_`i' = std_total - std_`selected'items_`i' 
 			* average difference for all individuals for a given simulation
