@@ -29,8 +29,13 @@ if you choose output **allcorr**, you will not enter a single number of items to
 
 `subsetscore test_item, selected(15) iterations(300) output(diff)`  will start by calculating the standardized mean of all `test_item` variables in your dataset. It will then randomly select 15 items among your `test_item` variables and calculate a standardized mean for them. It will do this 300 times, and calculate each time the difference between the full score and the subsetted score and calculate the mean difference in your population. The output will be an histogram of these 300 differences.
 
+<img src="img/diff.png" width="500">
+
 `subsetscore test_item, selected(5) iterations(1000) output(corr)`  will start by calculating the standardized mean of all `test_item` variables in your dataset. It will then randomly select 5 items among your `test_item` variables and calculate a standardized mean for them. It will do this 1000 times, and calculate each time the correlation between the full score and the subsetted score in your population. The output will be an histogram of these 1000 correlation coefficients.
+
+<img src="img/corr.png" width="500">
 
 `subsetscore test_item, minselected(1) maxselected(40) iterations(100) output(allcorr)`  is like calling `subsetscore test_item, selected(1) iterations(100) output(corr)`, then `subsetscore test_item, selected(2) iterations(100) output(corr)` , then `subsetscore test_item, selected(3) iterations(100) output(corr)`, etc until `subsetscore test_item, selected(40) iterations(100) output(corr)`, without displaying any of these intermediary outputs. The final output will be showing the correlation coefficients of each subsetted score as a function of the number of items comprising the score.
 
+<img src="img/allcorr.png" width="500">
 
