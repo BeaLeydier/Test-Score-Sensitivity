@@ -16,12 +16,6 @@ program subsetscore
 
 	syntax namelist(max=1 id="stubname" local), ITERations(integer) OUTput(name) [SELECTed(integer 5) MINselected(integer 1) MAXselected(integer 10)]  
 
-	if "`output'" == "diff" {
-		
-		selectitems_diff `namelist', selected(`selected') iterations(`iterations')
-		
-	}
-
 
 	if "`output'" == "corr" {
 		
@@ -90,46 +84,6 @@ program selectitems_data
 		}
 
 end
-
-
-**** Program that OUTPUTS the difference
-
-program selectitems_diff
-
-	syntax namelist(max=1 id="stubname" local), SELECTed(integer) ITERations(integer) 
-
-preserve			// Preserve so that the original dataset comes back
-
-	selectitems_data `namelist', selected(`selected') iterations(`iterations')
-
-	*** Calc the score with all items, as well as the mean score in the whole population (should be 0, because scores are standardized)
-	egen sum_total = rowtotal(`namelist'*)
-	egen std_total = std(sum_total)
-	egen mean = mean(std_total)
-
-	*** Calculate the difference between subsetted score and full score
-	forvalues i = 1/`iterations' {
-			* difference for each individual for each simulation
-		gen diff_`i' = std_total - std_`selected'items_`i' 
-			* average difference for all individuals for a given simulation
-		egen avg_diff_`i' = mean(diff_`i')	
-	}
-	
-
-		*** Transform dataset to be at the simulation level, keeping only the average difference in that simulation (as well as the pop mean)
-		keep mean avg_diff_* 
-		duplicates drop
-		reshape long avg_diff_, i(mean) j(n)
-		label drop _all
-		
-		*** Plot histogram, 
-		qui sum mean
-		local mean = r(mean)
-		hist avg_diff_, xline(`mean') title("Mean Differences between Subsetted Score and Full Score") subtitle("Distribution of `iterations' iterations selecting a random subset of `selected' items") xtitle("Population Mean Difference")
-	
-restore
-
-end 
 
 
 **** Program that OUTPUTS the correlation
