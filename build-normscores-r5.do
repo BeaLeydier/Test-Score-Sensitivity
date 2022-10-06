@@ -40,12 +40,130 @@ egen math_score = std(math_sum)
 	rename math_item09 math_item9
 
 
+	exit
+	
+*** REGRESSION program	
+	
+cap program drop selectitemsreg	
+program selectitemsreg
+
+	syntax varlist(min=2 numeric fv ts) [if] [weight], SELECTed(integer) ITERations(integer) stub(namelist max=1 id="stubname" local)
+	
+	* Extrat the Y variable from the varlist, and the X vars from the varlist
+	local yvar : word 1 of `varlist'		
+	local xvars : list varlist - yvar
+	
+	* Create the data simulations
+	selectitems_data `stub', selected(`selected') iterations(`iterations')
+	
+	* Run the normal reg
+	reg `varlist' `if' `weight'
+
+	* Run the reg with the created variables
+	forvalues i = 1/`iterations' {
+		reg  std_`selected'items_* `xvars' `if' `weight'
+	}
+	
+end 
+
+selectitemsreg math_score reportcard, select(5) iter(10) stub(math_item)
+
 	
 	
 	
+local varlist "math_score reportcard"
+local yvar : word 1 of `varlist'		
+local xvars : list varlist - yvar
+local stub "math_item"
+local selected 5
+local iterations 50
+
+local if ""
+local weight ""
+
+* Create the data simulations
+selectitems_data `stub', selected(`selected') iterations(`iterations')
+
+* Run the normal reg
+reg `varlist' `if' `weight'
+
+dis "`varlist'"
+dis "`xvars'"
+dis "`if'"
+dis "`weight'"
+dis "`selected'"
+dis "`iterations'"		
+		
+forvalues i = 1/`iterations' {
+		reg  std_`selected'items_`i' `xvars' `if' `weight'
+	}
 	
+
 	
+estimates clear	
 	
+reg math_score reportcard 
+	estimates store total
+
+reg std_5items_1 reportcard
+	estimates store selection_1
+
+reg std_5items_2 reportcard	
+	estimates store selection_2
+	
+estimates table _all, keep(reportcard) se
+mat list r(coef)	
+	
+local names : colfullnames r(coef)	
+dis "`names'"
+svmat r(coef), names("`names'")
+
+/** TODO
+	- Save in a dataset
+	- Keep odd columns only (col 1, 3, 5, etc) = coef and not variances
+	- Display 
+**/
+	
+/********************
+
+**** Program that OUTPUTS the difference : USELESS FOR NORMALIZED SCORES
+
+program selectitems_diff
+
+	syntax namelist(max=1 id="stubname" local), SELECTed(integer) ITERations(integer) 
+
+preserve			// Preserve so that the original dataset comes back
+
+	selectitems_data `namelist', selected(`selected') iterations(`iterations')
+
+	*** Calc the score with all items, as well as the mean score in the whole population (should be 0, because scores are standardized)
+	egen sum_total = rowtotal(`namelist'*)
+	egen std_total = std(sum_total)
+	egen mean = mean(std_total)
+
+	*** Calculate the difference between subsetted score and full score
+	forvalues i = 1/`iterations' {
+			* difference for each individual for each simulation
+		gen diff_`i' = std_total - std_`selected'items_`i' 
+			* average difference for all individuals for a given simulation
+		egen avg_diff_`i' = mean(diff_`i')	
+	}
+	
+
+		*** Transform dataset to be at the simulation level, keeping only the average difference in that simulation (as well as the pop mean)
+		keep mean avg_diff_* 
+		duplicates drop
+		reshape long avg_diff_, i(mean) j(n)
+		label drop _all
+		
+		*** Plot histogram, 
+		qui sum mean
+		local mean = r(mean)
+		hist avg_diff_, xline(`mean') title("Mean Differences between Subsetted Score and Full Score") subtitle("Distribution of `iterations' iterations selecting a random subset of `selected' items") xtitle("Population Mean Difference")
+	
+restore
+
+end 
 	
 	
 	
