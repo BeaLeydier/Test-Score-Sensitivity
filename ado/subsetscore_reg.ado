@@ -2,8 +2,8 @@
 
 program define subsetscore_reg
 
-	syntax varlist [if] [fweight  aweight  pweight  iweight], SELECTed(integer) ITERations(integer) STUBname(namelist max=1 local) [keep(varlist)]
-		
+	syntax varlist(min=2 fv ts) [if] [fweight  aweight  pweight  iweight], SELECTed(integer) ITERations(integer) STUBname(namelist max=1 local) [keep(varlist) cluster(varname)]
+	
 	* Extrat the Y variable from the varlist, and the X vars from the varlist
 	local yvar : word 1 of `varlist'		
 	local xvars : list varlist - yvar
@@ -18,11 +18,21 @@ program define subsetscore_reg
 	eststo clear 
 	
 	* Run the normal reg
-	eststo eq0: reg `varlist' `if' [`weight' `exp']
-
+	if "`cluster'" == "" {
+		eststo eq0: reg `varlist' `if' [`weight' `exp']
+	}
+	else if "`cluster'" != "" {
+		eststo eq0: reg `varlist' `if' [`weight' `exp'], cluster(`cluster')
+	}
+	
 	* Run the reg with the created variables
 	forvalues i = 1/`iterations' {
-		eststo eq`i': reg  std_`selected'items_`i' `xvars' `if' [`weight' `exp']
+	    if "`cluster'" == "" {
+			eststo eq`i': reg  std_`selected'items_`i' `xvars' `if' [`weight' `exp']
+		}
+		else if "`cluster'" != "" {
+			eststo eq`i': reg  std_`selected'items_`i' `xvars' `if' [`weight' `exp'], cluster(`cluster')		    
+		}
 	}
 	
 	* Store the regression values
@@ -84,11 +94,15 @@ program define subsetscore_reg
 		* Only keep the relevant coefficients for plotting 
 		keep if strpos("`keep'", var) > 0
 		
+		* Sort by coefficient size (within each coef) and create a new indicator of models to plot 
+		sort var b 
+		by var: gen i = _n
+		
 		* Plot the regression coefficients and their CI 		
-		twoway  (scatter b iteration if iteration==0, mcolor(gold)) (rcap ci_l ci_u iteration if iteration==0, lcolor(gold)) /// 	//reference reg
-			(scatter b iteration if iteration>0, mcolor(navy)) (rcap ci_l ci_u iteration if iteration>0, lcolor(navy)) ///			//simulated regs
-			, by(var, legend(off) title("Regression Coefficients On Different Calculated Scores") subtitle("With `iterations' iterations selecting a random subset of `selected' items")) ///
-			 ytitle("Regression Coefficient") xtitle("Simulation") yline(0) ylabel(-0.1(0.05)0.2)
+		twoway  (scatter b i if iteration==0, mcolor(gold) msize(tiny)) (rcap ci_l ci_u i if iteration==0, lcolor(gold) lwidth(tiny) msize(tiny)) /// 	//reference reg
+			(scatter b i if iteration>0, mcolor(navy) msize(tiny)) (rcap ci_l ci_u i if iteration>0, lcolor(navy) lwidth(tiny) msize(tiny)) ///			//simulated regs
+			, by(var, legend(off) note("") title("Regression Coefficients On Different Calculated Scores") subtitle("With `iterations' iterations selecting a random subset of `selected' items")) ///
+			 ytitle("Regression Coefficient") xtitle("") xlabel(none) yline(0) ylabel(-0.1(0.05)0.2)
 			
 		
 	restore 

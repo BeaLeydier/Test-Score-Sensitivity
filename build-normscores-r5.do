@@ -5,6 +5,8 @@
 *******************************************************************************/
 	////// Set up //////
 
+clear all
+	
 * Load the file paths
 do "_filepaths.do"
 
@@ -44,6 +46,8 @@ egen math_score = std(math_sum)
 
 * Gen the school grant variable 
 gen schoolgrant = (strata == 2 | strata == 3)	
+
+exit
 	
 ** Test the subsetscore program 
 
@@ -52,15 +56,44 @@ subsetscore math_item, selected(15) iterations(100) output(allcorr)
 
 ** Test the subsetscore_reg program 
 
-subsetscore_reg	math_score reportcard schoolgrant if district_name != "RAHIM YAR KHAN" , selected(20) iterations(50) stubname(math_item)	
-	
-	
-	
-	
+subsetscore_reg	math_score reportcard schoolgrant if district != "RAHIM YAR KHAN", selected(5) iterations(50) stubname(math_item)	
 	
 	exit
 	
 	
+//////////////////////////////////////////////	
+	
+	
+/******
+	Reproduce the main reportcard result 
+*******/
+
+** Load the item level test score data
+use "$dropboxuser/LEAPS_ItemBank/2_data_constructed/Item_TestScores_LEAPS.dta", clear
+
+keep uniqueid year mauzaid schoolid child_age child_enrolled child_class child_panel child_absent child_id child_female hhid mid id math_item*
+
+** Merge the 5year MLE theta for math 
+merge 1:1 id using "C:/Users/bl517/Documents/leaps-itembank/temp/math-traits-5years.dta", assert(3) nogen
+
+** Keep the math theta
+ren theta_mle math_mle 
+ren theta_eap math_eap 
+drop theta_pv1 theta_pv2 theta_pv3 theta_pv4 theta_pv5 theta_mle_se
+
+** Store the baseline (year 1) mle score for each village 
+bys mauzaid year: egen m_score = mean(math_mle)
+gen temp = m_score if year==1
+bys mauzaid: egen base_mauza_math_mle = min(temp)
+drop temp
+
+** Add in village globals
+merge m:1 mauzaid using "$dropboxuser/LEAPS_ReportCards_2011/2_data_constructed/basemau.dta"
+drop _merge
+global vilcontrols "mau_avg_hh_perc_literate m_HHI vil_median_expenditure vil_n_households"
+	
+	
+subsetscore_reg	math_mle reportcard i.district base_m_math_mle $vilcontrols if child_panel == 3, selected(5) iterations(50) stubname(math_item)	keep(reportcard) cluster(mauzaid)
 	
 	
 	
@@ -68,6 +101,13 @@ subsetscore_reg	math_score reportcard schoolgrant if district_name != "RAHIM YAR
 ///////////////////////////////////////////////////////////////////////////////	
 	
 ************ DRAFT	
+	
+/*	
+	local varlist math_score reportcard schoolgrant
+	local selected 5
+	local iterations 10 
+	local stubname math_item
+	
 	
 	
 	/*
