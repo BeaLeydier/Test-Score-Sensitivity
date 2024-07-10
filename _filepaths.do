@@ -14,11 +14,11 @@
 
 * Define machine-specific file path 
 
-if c(username)=="bl517" {
+if c(username)=="bl517" & c(os) == "Windows" {
 	global gituser "C:/Users/bl517/Documents/Github/Test-Score-Sensitivity"
 }
-else if c(username)=="" {
-	global gituser ""
+else if c(username)=="bl517" & c(os) == "MacOSX" {
+	global gituser "/Users/bl517/Github/Test-Score-Sensitivity"
 }
 else {
 	di as err "Please enter machine-specific path information for the git repo"
@@ -37,14 +37,14 @@ else {
 
 * Define machine-specific file path 
 
-if c(username)=="bl517" {
+if c(username)=="bl517" & c(os) == "Windows" {
 	global dropboxuser "C:/Users/bl517/Dropbox"
 }
 else if c(username)=="Beatrice" {
 	global dropboxuser "C:/Users/Beatrice/Dropbox"
 }
-else if c(username)=="" {
-	global dropboxuser ""
+else if c(username)=="bl517" & c(os) == "MacOSX" {
+	global dropboxuser "/Users/bl517/Dropbox"
 }
 else {
 	di as err "Please enter machine-specific path information for the Dropbox files"
