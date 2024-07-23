@@ -1,6 +1,7 @@
 /*******************************************************************************
 
-	Create z-scores for round 5 tests
+	Create 100 scale transformations
+		for years 1 and 2
 
 *******************************************************************************/
 	////// Set up //////
@@ -49,5 +50,8 @@ ren schoolid1 schoolid
 * Merge in reportcard info 
 merge m:1 mauzaid using "$dropboxuser/$RCT/mauzas.dta", assert(3) nogen
 
+* Save the test scores transformed data 
+save "$gituser/2_build/testcores_y1y2_wide.dta", replace
+
 * Scale transformation 
-scale_transformation, type(1) score1(total_mle1) score2(total_mle2) compgroup(reportcard) iterations(10) save("$gituser/scaling/iterations10.dta")
+scale_transformation, type(1) score1(total_mle1) score2(total_mle2) compgroup(reportcard) iterations(100) save("$gituser/scaling/iterations100.dta")
