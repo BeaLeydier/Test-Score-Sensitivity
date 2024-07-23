@@ -1,11 +1,12 @@
 /*******************************************************************************
 
-	Create z-scores for round 5 tests
+	Output results for round 5 test scores
 
 *******************************************************************************/
 	////// Set up //////
 
 clear all
+set maxvar 32767	
 	
 * Load the file paths
 do "_filepaths.do"
@@ -51,12 +52,22 @@ exit
 	
 ** Test the subsetscore program 
 
-subsetscore math_item, selected(15) iterations(100) output(allcorr)
-
+subsetscore math_item, min(2) max(44) iterations(100) output(allcorr)
+graph export "$gituser/img/allcorr-y5.png", replace
 
 ** Test the subsetscore_reg program 
 
+subsetscore_reg	math_score reportcard, selected(5) iterations(50) stubname(math_item)	
+graph export "$gituser/img/reg-y5-5items.png", replace
+
+subsetscore_reg	math_score reportcard, selected(20) iterations(100) stubname(math_item)	
+graph export "$gituser/img/reg-y5-20items.png", replace
+
+exit 
+
+
 subsetscore_reg	math_score reportcard schoolgrant if district != "RAHIM YAR KHAN", selected(5) iterations(50) stubname(math_item)	
+graph export "$gituser/img/reg-2coefs.png", replace
 	
 	exit
 	

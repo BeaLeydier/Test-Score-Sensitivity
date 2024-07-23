@@ -104,6 +104,8 @@ program define subsetscore_reg
 			, by(var, legend(off) note("") title("Regression Coefficients On Different Calculated Scores") subtitle("With `iterations' iterations selecting a random subset of `selected' items")) ///
 			 ytitle("Regression Coefficient") xtitle("") xlabel(none) yline(0) ylabel(-0.1(0.05)0.2)
 			
+		* Save the tempfile 
+		save "$gituser/2_temp/output.dta", replace
 		
 	restore 
 	
