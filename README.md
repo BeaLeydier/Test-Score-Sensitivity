@@ -43,7 +43,7 @@ subsetscore_reg is a user-written command written in Stata 16.
 
 Calculating the same standardized scores and their random subset as the subsetscore command, it thens runs your specified regression model (on the full test score variable), as well as the same regression model on each of the randomly created subsetted score variable. It the plots a result of the regression coefficients across each randomly generated subsetted test score.
 
-The objective is to understand how sensitive are your regression results to the number of items selected.
+The objective is to understand how sensitive are your regression results to the number of items used to calculate test scores.
 
 The syntax is as follows
 
