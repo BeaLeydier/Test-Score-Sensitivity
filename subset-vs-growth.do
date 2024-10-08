@@ -61,13 +61,16 @@ gen schoolgrant = (strata == 2 | strata == 3)
 
 subsetscore_reg	math_score reportcard if year==2, selected(20) iterations(100) stubname(math_item)
 
-
+exit 
 * Store the y1 - y2 growth in control group
+
+local iterations 100
+local selected 20
 
 ** reshape wide 
 local list 
-forvalues iter = 1/50 {
-	local list `list' std_5items_`iter'
+forvalues iter = 1/`iterations' {
+	local list `list' std_`selected'items_`iter'
 }
 
 foreach var of varlist `list' {
@@ -75,8 +78,8 @@ foreach var of varlist `list' {
 }
 
 local toreshape 
-forvalues iter = 1/50 {
-	local toreshape `toreshape' std_5items_`iter'_
+forvalues iter = 1/`iterations' {
+	local toreshape `toreshape' std_`selected'items_`iter'_
 }
 
 keep childcode year math_score `toreshape' mauzaid reportcard
@@ -85,8 +88,8 @@ reshape wide math_score `toreshape' mauzaid, j(year) i(childcode)
 ren mauzaid1 mauzaid
 
 gen growth_0 = math_score2 - math_score1
-forvalues iter = 1/50 {
-	gen growth_`iter' = std_5items_`iter'_2 - std_5items_`iter'_1
+forvalues iter = 1/`iterations' {
+	gen growth_`iter' = std_`selected'items_`iter'_2 - std_`selected'items_`iter'_1
 }
 
 keep childcode reportcard growth*
@@ -105,10 +108,10 @@ use "$gituser/2_temp/output.dta", clear
 
 merge 1:1 iteration using "$gituser/2_temp/controlgrowth.dta", keepusing(growth_control) assert(3) nogen
 
-local iterations 50
-local selected 5
-twoway  (scatter b growth_control if iteration==0, mcolor(gold)) /// 	//reference reg
-	(scatter b growth_control if iteration>0, mcolor(navy)) ///			//simulated regs
+local iterations 100
+local selected 20
+twoway  (scatter b growth_control if iteration>0, mcolor(navy)) ///			//simulated regs
+	(scatter b growth_control if iteration==0, mcolor(gold)) /// 	//reference reg
 	, by(var, legend(off) note("") title("Regression Coefficients x Control Group Growth") subtitle("With `iterations' iterations selecting a random subset of `selected' items")) ///
 	 ytitle("Regression Coefficient") xtitle("Control Group Growth") 
-graph export "$gituser/img/growth-5items.png", replace
+graph export "$gituser/img/growth-20items.png", replace
