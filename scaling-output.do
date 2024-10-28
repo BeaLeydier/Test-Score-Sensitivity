@@ -15,13 +15,13 @@ adopath ++ "$gituser/ado"
 	////// Clean the output //////
 
 * Load the output from the scale transformation
-use "$gituser/scaling/iterations100.dta", clear
-
-* Add an identifier of iterations
-gen i = _n
+use "$gituser/scaling/iterations100-y4-max-10obs.dta", clear
 
 * Keep only the observations that are order preserving
 keep if obj != .
+
+* Add an identifier of iterations
+gen i = _n
 
 * Store the names of the iterations in a global 
 levelsof i, local(iterations)
