@@ -13,8 +13,16 @@ do "$gituser/_filepaths.do"
 adopath ++ "$gituser/ado" 
 
 * Define endline year
-local endyear 4
+local endyear 2
 
+* Define n of iterations
+local iter 500
+
+* Define subject (for iterations file name)
+local subject math-
+
+* Define subject (for test score variable name)
+local subj math
 
 /*******************************************************************************
 
@@ -25,7 +33,7 @@ local endyear 4
 // Max gap growth between T and C
 
 * Load the output from the scale transformation
-use "$gituser/scaling/iterations100-y`endyear'-max.dta", clear
+use "$gituser/scaling/`subject'iterations`iter'-y`endyear'-max.dta", clear
 
 * Keep only the observations that are order preserving
 keep if obj != .
@@ -46,7 +54,7 @@ save `max'
 /// Min gap growth between T and C 
 
 * Load the output from the scale transformation
-use "$gituser/scaling/iterations100-y`endyear'-min.dta", clear
+use "$gituser/scaling/`subject'iterations`iter'-y`endyear'-min.dta", clear
 
 * Keep only the observations that are order preserving
 keep if obj != .
@@ -67,7 +75,7 @@ save `min'
 /// Max correlation between years 1 and years `endyear' 
 
 * Load the output from the scale transformation
-use "$gituser/scaling/iterations100-y`endyear'-corr.dta", clear
+use "$gituser/scaling/`subject'iterations`iter'-y`endyear'-corr.dta", clear
 
 * Keep only the observations that are order preserving
 keep if obj != .
@@ -88,7 +96,7 @@ save `corr'
 /// Max r2 between years 1 and years `endyear'
 
 * Load the output from the scale transformation
-use "$gituser/scaling/iterations100-y`endyear'-r2.dta", clear
+use "$gituser/scaling/`subject'iterations`iter'-y`endyear'-r2.dta", clear
 
 * Keep only the observations that are order preserving
 keep if obj != .
@@ -146,10 +154,10 @@ merge m:1 obs using `coefs', nogen assert(3)
 * Calculate the new testscores
 foreach i in max min corr r2 {
 	foreach year in 1 `endyear' {
-		gen total_mle`year'_`i' =  b1_`i' * (total_mle`year' - c_`i') + ///
-			b2_`i' * (total_mle`year' - c_`i')^2 + b3_`i' * (total_mle`year' - c_`i')^3 + /// 
-			b4_`i' * (total_mle`year' - c_`i')^4 + b5_`i' * (total_mle`year' - c_`i')^5 + /// 
-			b6_`i' * (total_mle`year' - c_`i')^6  	
+		gen `subj'_mle`year'_`i' =  b1_`i' * (`subj'_mle`year' - c_`i') + ///
+			b2_`i' * (`subj'_mle`year' - c_`i')^2 + b3_`i' * (`subj'_mle`year' - c_`i')^3 + /// 
+			b4_`i' * (`subj'_mle`year' - c_`i')^4 + b5_`i' * (`subj'_mle`year' - c_`i')^5 + /// 
+			b6_`i' * (`subj'_mle`year' - c_`i')^6  	
 	}
 }
 
@@ -160,20 +168,20 @@ drop b*_* c_*
 *** step 1 : list the variables to reshape
 local varlist 
 foreach i in max min corr r2 {
-	local varlist `varlist' total_mle@_`i'
+	local varlist `varlist' `subj'_mle@_`i'
 }
 gl vartoreshape `varlist'
 
 *** step 2 : reshape at the individual-year level 
-reshape long total_mle@ $vartoreshape, i(childuniqueid) j(year)
+reshape long `subj'_mle@ $vartoreshape, i(childuniqueid) j(year)
 
 *** step 3 : standardize 
 foreach i in max min corr r2 {
-	egen total_mle_`i'_std = std(total_mle_`i')
+	egen `subj'_mle_`i'_std = std(`subj'_mle_`i')
 }
 
 * Save new file 
-save "$gituser/2_build/testcores_y1y`endyear'_rescaled.dta", replace 
+save "$gituser/2_build/testcores_y1y`endyear'_rescaled_`subject'`iter'.dta", replace 
 
 
 /*******************************************************************************
@@ -184,7 +192,7 @@ save "$gituser/2_build/testcores_y1y`endyear'_rescaled.dta", replace
 
 
 // Generate correlation matrix
-correlate total_mle total_mle_max_std total_mle_min_std total_mle_corr_std total_mle_r2_std
+correlate `subj'_mle `subj'_mle_max_std `subj'_mle_min_std `subj'_mle_corr_std `subj'_mle_r2_std
 
 // store results
 matrix C = r(C)
@@ -196,9 +204,8 @@ heatplot C, color(hcl diverging, intensity(.6)) ///
     xlabel(, angle(45) labsize(small)) ///
     ylabel(, angle(0) labsize(small)) ///
     title("Correlation Heatmap")	
-graph export "$gituser/img/rescaled-corr-y`endyear'.png", as(png) name("Graph") replace	 
+graph export "$gituser/img/rescaled-corr-y`endyear'_`subject'`iter'.png", as(png) name("Graph") replace	 
 	
-
 
 /*******************************************************************************
 
@@ -220,11 +227,11 @@ graph export "$gituser/img/rescaled-corr-y`endyear'.png", as(png) name("Graph") 
 	local lag = `endyear' - 1	
 	
 	* Run the normal reg
-	eststo eqog: reg total_mle reportcard i.district L`lag'.total_mle if year==`endyear', vce(cluster mauzaid)
+	eststo eqog: reg `subj'_mle reportcard i.district L`lag'.`subj'_mle if year==`endyear', vce(cluster mauzaid)
 
 	* Run the reg with the created variables
 	foreach i in max min corr r2 {
-		eststo eq`i': reg  total_mle_`i'_std reportcard i.district L`lag'.total_mle_`i'_std if year==`endyear', vce(cluster mauzaid)
+		eststo eq`i': reg  `subj'_mle_`i'_std reportcard i.district L`lag'.`subj'_mle_`i'_std if year==`endyear', vce(cluster mauzaid)
 	}
 	
 	* Store the regression values
@@ -285,18 +292,18 @@ graph export "$gituser/img/rescaled-corr-y`endyear'.png", as(png) name("Graph") 
 
 		* Only keep the relevant coefficients for plotting 
 		if `lag' == 1 {
-			replace var = "L.total_mle" if var == "L.total_mle_corr_std" 
-			replace var = "L.total_mle" if var == "L.total_mle_max_std" 
-			replace var = "L.total_mle" if var == "L.total_mle_min_std" 
-			replace var = "L.total_mle" if var == "L.total_mle_r2_std" 			
-			local keep reportcard L.total_mle
+			replace var = "L.`subj'_mle" if var == "L.`subj'_mle_corr_std" 
+			replace var = "L.`subj'_mle" if var == "L.`subj'_mle_max_std" 
+			replace var = "L.`subj'_mle" if var == "L.`subj'_mle_min_std" 
+			replace var = "L.`subj'_mle" if var == "L.`subj'_mle_r2_std" 			
+			local keep reportcard L.`subj'_mle
 		} 
 		else {
-			replace var = "L`lag'.total_mle" if var == "L`lag'.total_mle_corr_std" 
-			replace var = "L`lag'.total_mle" if var == "L`lag'.total_mle_max_std" 
-			replace var = "L`lag'.total_mle" if var == "L`lag'.total_mle_min_std" 
-			replace var = "L`lag'.total_mle" if var == "L`lag'.total_mle_r2_std" 
-			local keep reportcard L`lag'.total_mle
+			replace var = "L`lag'.`subj'_mle" if var == "L`lag'.`subj'_mle_corr_std" 
+			replace var = "L`lag'.`subj'_mle" if var == "L`lag'.`subj'_mle_max_std" 
+			replace var = "L`lag'.`subj'_mle" if var == "L`lag'.`subj'_mle_min_std" 
+			replace var = "L`lag'.`subj'_mle" if var == "L`lag'.`subj'_mle_r2_std" 
+			local keep reportcard L`lag'.`subj'_mle
 		}
 		
 		keep if strpos("`keep'", var) > 0
@@ -313,9 +320,9 @@ graph export "$gituser/img/rescaled-corr-y`endyear'.png", as(png) name("Graph") 
 			(scatter b x if iteration=="min", mcolor(navy)) (rcap ci_l ci_u x if iteration=="min", lcolor(navy)) /// 	//minimizing gap growth reg
 			(scatter b x if iteration=="corr", mcolor(lime)) (rcap ci_l ci_u x if iteration=="corr", lcolor(lime)) /// 	//max corr 
 			(scatter b x if iteration=="r2", mcolor(purple)) (rcap ci_l ci_u x if iteration=="r2", lcolor(purple)) /// 	//max r2 
-			, by(var, legend(off) title("Regression (on Y`endyear' test scores) Coefficients") note("Yellow = original test score." "Red = test scores maximizing the y1-y`endyear' gap growth between T and C." "Blue = test scores minimizing the y1-y`endyear' gap growth between T and C." "Lime = test scores maximizing correlation between y1 and y`endyear'. Purple = test scores maximizing the R2 between y1 and y`endyear'.")) ///
+			, by(var, legend(off) title("Regression (on Y`endyear' `subj' test scores) Coefficients") note("Yellow = original test score." "Red = test scores maximizing the y1-y`endyear' gap growth between T and C." "Blue = test scores minimizing the y1-y`endyear' gap growth between T and C." "Lime = test scores maximizing correlation between y1 and y`endyear'. Purple = test scores maximizing the R2 between y1 and y`endyear'.")) ///
 			 ytitle("Regression Coefficient") xtitle("") yline(0) xlabel(none) 
-		graph export "$gituser/img/rescaled-regression-lagged-y`endyear'.png", as(png) name("Graph") replace
+		graph export "$gituser/img/rescaled-regression-lagged-y`endyear'`subject'`iter'.png", as(png) name("Graph") replace
 				
 	restore
 
@@ -339,11 +346,11 @@ graph export "$gituser/img/rescaled-corr-y`endyear'.png", as(png) name("Graph") 
 	eststo clear 
 		
 	* Run the normal reg
-	eststo eqog: reg total_mle reportcard i.district if year==`endyear', vce(cluster mauzaid)
+	eststo eqog: reg `subj'_mle reportcard i.district if year==`endyear', vce(cluster mauzaid)
 
 	* Run the reg with the created variables
 	foreach i in max min corr r2 {
-		eststo eq`i': reg  total_mle_`i'_std reportcard i.district if year==`endyear', vce(cluster mauzaid)
+		eststo eq`i': reg  `subj'_mle_`i'_std reportcard i.district if year==`endyear', vce(cluster mauzaid)
 	}
 	
 	* Store the regression values
@@ -420,7 +427,7 @@ graph export "$gituser/img/rescaled-corr-y`endyear'.png", as(png) name("Graph") 
 			(scatter b x if iteration=="r2", mcolor(purple)) (rcap ci_l ci_u x if iteration=="r2", lcolor(purple)) /// 	//max r2 
 			, by(var, legend(off) title("Regression (on Y`endyear' test scores) Coefficients") note("Yellow = original test score." "Red = test scores maximizing the y1-y`endyear' gap growth between T and C." "Blue = test scores minimizing the y1-y`endyear' gap growth between T and C." "Lime = test scores maximizing correlation between y1 and y`endyear'. Purple = test scores maximizing the R2 between y1 and y`endyear'.")) ///
 			 ytitle("Regression Coefficient") xtitle("") yline(0) xlabel(none) 
-		graph export "$gituser/img/rescaled-regression-y`endyear'.png", as(png) name("Graph") replace
+		graph export "$gituser/img/rescaled-regression-y`endyear'`subject'`iter'.png", as(png) name("Graph") replace
 				
 	restore
 
