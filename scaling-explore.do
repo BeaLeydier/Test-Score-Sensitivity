@@ -64,8 +64,6 @@ br year childuniqueid rank_og rank_corr math_mle math_mle_corr
 br year childuniqueid rank_og rank_r2 math_mle math_mle_r2
 
 
-
-
 /////////////////////////////////////////////////////////////////
 
 ///////// Explorations with total_mle 
