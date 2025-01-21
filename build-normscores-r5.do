@@ -57,7 +57,7 @@ graph export "$gituser/img/allcorr-y5.png", replace
 
 ** Test the subsetscore_reg program 
 
-subsetscore_reg	math_score reportcard, selected(5) iterations(50) stubname(math_item)	
+subsetscore_reg	math_score reportcard, selected(5) iterations(100) stubname(math_item)	
 graph export "$gituser/img/reg-y5-5items.png", replace
 
 subsetscore_reg	math_score reportcard, selected(20) iterations(100) stubname(math_item)	
