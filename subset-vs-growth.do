@@ -1,10 +1,17 @@
 /*******************************************************************************
 
-	Output results for round 5 test scores
+	Different test score gains against the control group growth
 
 *******************************************************************************/
-	////// Set up //////
+	
 
+	/********************************************
+
+			Set up
+
+	********************************************/
+	
+	
 clear all
 	
 * Load the file paths
@@ -13,7 +20,19 @@ do "_filepaths.do"
 * Ado path 
 adopath ++ "$gituser/ado" 
 
-	////// Upload test scores //////
+* Number of iterations
+local iterations 100
+local selected 5
+
+
+	/********************************************
+
+			Bring in Math Item Data
+				- Years 1 & 2 
+				- Item-Level Data
+				- Calculcated Scores from study 
+
+	********************************************/
 
 * Upload raw test scores
 use "$dropboxuser/$rawscores/public_child_tests_data_5yrs.dta", clear
@@ -24,15 +43,21 @@ drop if mauzaid==.
 * Keep years 1 and 2 
 keep if year == 1 | year == 2
 
-* Keep only people observed twice
-duplicates tag childcode, gen(dup)
-drop if dup==0
-drop dup
+* Only keep the items common between years 1 and 2 
+mdesc math_item* 
+
+** drop items not used in year 1
+drop math_item43 math_item44 math_item45 math_item46 math_item47 math_item48 math_item49 math_item50 math_item51 math_item52 math_item53 math_item54 math_item55 
+
+** drop items not used in year 2
+drop math_item03 math_item04 math_item05 math_item06 math_item07 math_item08 math_item10 math_item14 math_item17 math_item21 math_item29 math_item35 math_item41 
+
+mdesc math_item*
 
 * Count number of items, and keep only the children with the max
 egen math_count = anycount(math_item*), values(0 1)
 tab math_count
-	//all have exactly 42 items 
+	//all have exactly 29 items (42 when we include non common items)
 	
 *Drop all the variables that have missing values for everybody
 missings dropvars, force
@@ -43,75 +68,105 @@ keep year childcode math_item* math_sum math_count mauzaid child_age child_femal
 * Add the RCT data 
 merge m:1 mauzaid using "$dropboxuser/$RCT/mauzas.dta", nogen
 
-*Generate the z score (dev from the mean, IN standard deviations) for each topic
-egen math_score = std(math_sum)
-		*egen eng_zscore = std(eng_sum)
-		*egen urdu_zscore = std(urdu_sum)
-		*egen all_zscore = std(allsubjects_sum)
+* Add the calculated scores from study 
+preserve 
+	use "/Users/bl517/Dropbox/LEAPS_ReportCards_2011/2_data_constructed/child_inclr5sibs_wide.dta", clear
+	
+	rename childuniqueid childcode 
+	
+	keep childcode total_mle1 math_mle1 total_mle2 math_mle2 child_panel district
+	
+	reshape long total_mle math_mle, i(childcode) j(year)
+	
+	tempfile scores
+	save `scores'
+restore 
+
+merge 1:1 year childcode using `scores'
+
+tab child_panel _merge
+drop if _merge==2
+drop _merge 
+
+
+	/********************************************
+
+			Calculate Subsetted Scores 
+			
+	********************************************/
+
+*Generate the total math scores 
+egen mean_math = rowmean(math_item*)			
+egen std_math = std(mean_math)	
+
+*Explore 
+table reportcard year, stat(mean mean_math std_math math_mle total_mle)
 
 *Number the items consistently
 	rename math_item01 math_item1
-	rename math_item03 math_item3
 	rename math_item09 math_item9
-
-* Gen the school grant variable 
-gen schoolgrant = (strata == 2 | strata == 3)	
 
 * Calculate the math subsets
 
-subsetscore_reg	math_score reportcard if year==2, selected(20) iterations(100) stubname(math_item)
+subsetscore_reg	std_math reportcard if year==2 using "$gituser/img/reg-`selected'items-`iterations'iter.png", selected(`selected') iterations(`iterations') stubname(math_item)
 
-exit 
-* Store the y1 - y2 growth in control group
+	/*Note : this program saves the results in temp/output.dta */
 
-local iterations 100
-local selected 20
+	/********************************************
 
-** reshape wide 
-local list 
-forvalues iter = 1/`iterations' {
-	local list `list' std_`selected'items_`iter'
-}
+			Calculate Control Group Growth
+			
+	********************************************/
 
-foreach var of varlist `list' {
-	ren `var' `var'_
-}
+* Only keep relevant variables
+keep childcode year std_* math_mle total_mle mauzaid reportcard
+	 
+* Reshape long at the iteration level 
+rename std_math std_5items_0
+reshape long std_5items_, i(childcode year)	j(iteration)
+	
+* Reshape wide for years in column
 
-local toreshape 
-forvalues iter = 1/`iterations' {
-	local toreshape `toreshape' std_`selected'items_`iter'_
-}
-
-keep childcode year math_score `toreshape' mauzaid reportcard
-
-reshape wide math_score `toreshape' mauzaid, j(year) i(childcode)
+reshape wide math_mle total_mle std_5items_ mauzaid, j(year) i(childcode iteration)
 ren mauzaid1 mauzaid
 
-gen growth_0 = math_score2 - math_score1
-forvalues iter = 1/`iterations' {
-	gen growth_`iter' = std_`selected'items_`iter'_2 - std_`selected'items_`iter'_1
-}
-
-keep childcode reportcard growth*
-
-reshape long growth_, i(childcode) j(iteration)
+* Collapse at the group-iteration level
+collapse (mean) math_mle1 total_mle1 std_5items_1 math_mle2 total_mle2 std_5items_2, by(reportcard iteration)
 label drop childactivity
 
-collapse (mean) growth_, by(iteration reportcard)
-keep if reportcard==0 
-ren growth_ growth_control 
+* Keep the control group 
+keep if reportcard==0
+
+* Calculate the diff between Y1 and Y2
+gen growth_control = std_5items_2 - std_5items_1
 
 save "$gituser/2_temp/controlgrowth.dta", replace
 
+	/********************************************
+
+			Graph Coeff Estimates Against
+			Control Group Growth
+			
+	********************************************/
 
 use "$gituser/2_temp/output.dta", clear
 
 merge 1:1 iteration using "$gituser/2_temp/controlgrowth.dta", keepusing(growth_control) assert(3) nogen
 
-local iterations 100
-local selected 20
 twoway  (scatter b growth_control if iteration>0, mcolor(navy)) ///			//simulated regs
 	(scatter b growth_control if iteration==0, mcolor(gold)) /// 	//reference reg
 	, by(var, legend(off) note("") title("Regression Coefficients x Control Group Growth") subtitle("With `iterations' iterations selecting a random subset of `selected' items")) ///
 	 ytitle("Regression Coefficient") xtitle("Control Group Growth") 
-graph export "$gituser/img/growth-20items.png", replace
+graph export "$gituser/img/growth-`selected'items-`iterations'iter.png", replace
+
+gen lays = b / abs(growth_control)
+sort b
+
+graph box b growth_control lays, legend(position(6) rows(1)) title("Variance on estimates across `iterations' iterations") subtitle("Score from `selected' items") 
+graph export "$gituser/img/var-estimates-`selected'items-`iterations'iter.png", replace
+
+graph box b growth_control lays, legend(position(6) rows(1)) title("Variance on estimates across `iterations' iterations") subtitle("Score from `selected' items") nooutsides
+graph export "$gituser/img/var-estimates-`selected'items-`iterations'iter-nooutsides.png", replace
+
+//twoway rcap ci_l ci_u iteration || scatter b iteration
+

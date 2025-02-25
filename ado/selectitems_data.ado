@@ -41,8 +41,8 @@ program define selectitems_data
 			}
 
 			* Calculate the score with these n items
-			egen sum_`selected'items_`iteration' = rowtotal(`itemstosum')			
-			egen std_`selected'items_`iteration' = std(sum_`selected'items_`iteration')	
+			egen mean_`selected'items_`iteration' = rowmean(`itemstosum')			
+			egen std_`selected'items_`iteration' = std(mean_`selected'items_`iteration')	
 				
 			* Store the selected items list in a macro
 			global selecteditems_`iteration' = "`selecteditems'"
