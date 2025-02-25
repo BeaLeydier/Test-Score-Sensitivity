@@ -106,7 +106,8 @@ program define subsetscore_reg
 		graph export "`using'", replace
 			
 		* Save the tempfile 
-		save "$gituser/2_temp/output.dta", replace
+		gen n_items = "`selected'"
+		save "$gituser/2_temp/output_reg_`selected'.dta", replace
 		
 	restore 
 	

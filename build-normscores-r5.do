@@ -34,6 +34,31 @@ keep childcode math_item* math_sum math_count mauzaid child_age child_female
 * Add the RCT data 
 merge m:1 mauzaid using "$dropboxuser/$RCT/mauzas.dta", nogen
 
+* Add the calculated baseline scores from study at the village level 
+preserve 
+	use "/Users/bl517/Dropbox/LEAPS_ReportCards_2011/2_data_constructed/child_inclr5sibs_wide.dta", clear
+	
+	bys mauzaid: egen base_math = mean(math_mle1)
+		
+	keep mauzaid base_math
+	
+	duplicates drop
+		
+	tempfile scores
+	save `scores'
+restore 
+
+merge m:1 mauzaid using `scores', assert(3) nogen
+
+** Store the baseline (year 1) mle score for each village 
+ren base_math base_mauza_math_mle 
+
+** Add in village globals
+merge m:1 mauzaid using "$dropboxuser/LEAPS_ReportCards_2011/2_data_constructed/basemau.dta"
+drop _merge
+global vilcontrols "mau_avg_hh_perc_literate m_HHI vil_median_expenditure vil_n_households"
+	
+
 *Generate the z score (dev from the mean, IN standard deviations) for each topic
 egen math_score = std(math_sum)
 		*egen eng_zscore = std(eng_sum)
@@ -44,31 +69,50 @@ egen math_score = std(math_sum)
 	rename math_item01 math_item1
 	rename math_item03 math_item3
 	rename math_item09 math_item9
-
-* Gen the school grant variable 
-gen schoolgrant = (strata == 2 | strata == 3)	
-
-exit
 	
 ** Test the subsetscore program 
 
+/* takes a while to run
 subsetscore math_item, min(2) max(44) iterations(100) output(allcorr)
 graph export "$gituser/img/allcorr-y5.png", replace
+*/ 
 
-** Test the subsetscore_reg program 
+** Run the subsetscore_reg program for two item sizes
 
-subsetscore_reg	math_score reportcard, selected(5) iterations(100) stubname(math_item)	
-graph export "$gituser/img/reg-y5-5items.png", replace
+subsetscore_reg	math_score reportcard i.district base_m_math_mle $vilcontrols using "$gituser/img/reg-y5-5items.png", selected(5) iterations(100) stubname(math_item) cluster(mauzaid) keep(reportcard)
 
-subsetscore_reg	math_score reportcard, selected(20) iterations(100) stubname(math_item)	
-graph export "$gituser/img/reg-y5-20items.png", replace
+subsetscore_reg	math_score reportcard i.district base_m_math_mle $vilcontrols using "$gituser/img/reg-y5-20items.png", selected(20) iterations(100) stubname(math_item)	cluster(mauzaid) keep(reportcard)	
 
 exit 
 
 
+** Run the subsetscore_reg for all item sizes 
+
+foreach item in 2 3 4 6 7 8 9 10 11 12 13 14 15 16 17 18 19 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 {
+	subsetscore_reg	math_score reportcard i.district base_m_math_mle $vilcontrols using "$gituser/img/reg-y5-`item'items.png", selected(`item') iterations(100) stubname(math_item)	cluster(mauzaid) keep(reportcard)
+}
+
+** Append all the intermediate output files 
+
+use "$gituser/2_temp/output_reg_2.dta", clear
+foreach item in 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 {
+	append using "$gituser/2_temp/output_reg_`item'.dta"
+}
+
+destring(n_items), replace
+
+graph box b, over(n_items, label(labsize(small))) title("Variance of coefficients over 100 iterations") subtitle("As a function of the number of items in the test score") ytitle("Coefficient estimates") 
+graph export "$gituser/img/var-coeff-100regs-over-n-items.png", replace
+
+graph box se, over(n_items, label(labsize(small))) title("Variance of standard errors over 100 iterations") subtitle("As a function of the number of items in the test score") ytitle("Standard errors of coefficients") 
+graph export "$gituser/img/var-se-100regs-over-n-items.png", replace
+
+
+
+/*
 subsetscore_reg	math_score reportcard schoolgrant if district != "RAHIM YAR KHAN", selected(5) iterations(50) stubname(math_item)	
 graph export "$gituser/img/reg-2coefs.png", replace
-	
+*/	
 	exit
 	
 	
