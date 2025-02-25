@@ -43,10 +43,21 @@ drop if mauzaid==.
 * Keep years 1 and 2 
 keep if year == 1 | year == 2
 
+* Only keep the items common between years 1 and 2 
+mdesc math_item* 
+
+** drop items not used in year 1
+drop math_item43 math_item44 math_item45 math_item46 math_item47 math_item48 math_item49 math_item50 math_item51 math_item52 math_item53 math_item54 math_item55 
+
+** drop items not used in year 2
+drop math_item03 math_item04 math_item05 math_item06 math_item07 math_item08 math_item10 math_item14 math_item17 math_item21 math_item29 math_item35 math_item41 
+
+mdesc math_item*
+
 * Count number of items, and keep only the children with the max
 egen math_count = anycount(math_item*), values(0 1)
 tab math_count
-	//all have exactly 42 items 
+	//all have exactly 29 items (42 when we include non common items)
 	
 *Drop all the variables that have missing values for everybody
 missings dropvars, force
@@ -93,7 +104,6 @@ table reportcard year, stat(mean mean_math std_math math_mle total_mle)
 
 *Number the items consistently
 	rename math_item01 math_item1
-	rename math_item03 math_item3
 	rename math_item09 math_item9
 
 * Calculate the math subsets
@@ -151,3 +161,12 @@ graph export "$gituser/img/growth-`selected'items-`iterations'iter.png", replace
 
 gen lays = b / abs(growth_control)
 sort b
+
+graph box b growth_control lays, legend(position(6) rows(1)) title("Variance on estimates across `iterations' iterations") subtitle("Score from `selected' items") 
+graph export "$gituser/img/var-estimates-`selected'items-`iterations'iter.png", replace
+
+graph box b growth_control lays, legend(position(6) rows(1)) title("Variance on estimates across `iterations' iterations") subtitle("Score from `selected' items") nooutsides
+graph export "$gituser/img/var-estimates-`selected'items-`iterations'iter-nooutsides.png", replace
+
+//twoway rcap ci_l ci_u iteration || scatter b iteration
+
